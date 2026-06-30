@@ -126,6 +126,7 @@ class Bomb(pg.sprite.Sprite):
         self.rect.centerx = emy.rect.centerx
         self.rect.centery = emy.rect.centery+emy.rect.height//2
         self.speed = 6
+        self.state = "active"
 
     def update(self):
         """
@@ -287,6 +288,33 @@ class Gravity(pg.sprite.Sprite):
 
         if self.life < 0:
             self.kill()
+class EMP:
+    """
+    電磁パルス（EMP）に関するクラス
+    発動時に存在する敵機と爆弾を無効化する
+    """
+    def __init__(self, emys: pg.sprite.Group, bombs: pg.sprite.Group, screen: pg.Surface):
+        """
+        敵機と爆弾を無効化し，画面全体に黄色の矩形を一瞬表示する
+        引数1 emys：敵機インスタンスのグループ
+        引数2 bombs：爆弾インスタンスのグループ
+        引数3 screen：画面Surface
+        """
+        # 敵機を無効化する
+        for emy in emys:
+            emy.interval = float("inf")  # intervalを無限大にして爆弾投下不能に
+            emy.image = pg.transform.laplacian(emy.image)  # ラプラシアンフィルタを掛ける
+        # 爆弾を無効化する
+        for bomb in bombs: 
+            bomb.speed /= 2  # 速度を半減する
+            bomb.state = "inactive"  # 状態をinactiveに変更する
+        # 画面全体に透明度のある黄色の矩形を0.05秒表示する
+        rect_img = pg.Surface((WIDTH, HEIGHT))
+        rect_img.fill((255, 255, 0))  # 黄色
+        rect_img.set_alpha(128)  # 透明度（0～255）
+        screen.blit(rect_img, (0, 0))
+        pg.display.update()
+        time.sleep(0.05)
 
 
 def main():
@@ -320,6 +348,9 @@ def main():
             ):
                 score.value -= 200
                 gravities.add(Gravity(400))
+            if event.type == pg.KEYDOWN and event.key == pg.K_e and score.value > 20:
+                EMP(emys, bombs, screen)  # EMP発動
+                score.value -= 20  # スコアを20消費
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -363,6 +394,8 @@ def main():
                 return
 
 
+            if bomb.state == "inactive":
+                continue  # 無効化された爆弾は起爆せず消滅するだけ
             bird.change_img(8, screen)  # こうかとん悲しみエフェクト
             score.update(screen)
             pg.display.update()
